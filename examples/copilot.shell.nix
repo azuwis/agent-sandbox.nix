@@ -2,6 +2,7 @@
 # Copy this into your project and adjust as needed.
 #
 # Usage:
+#   export GITHUB_TOKEN="your_token_here"
 #   nix-shell examples/copilot.shell.nix
 
 let

@@ -8,18 +8,8 @@
 # Usage:
 #   export CLAUDE_CODE_OAUTH_TOKEN="your_token_here"
 #   nix-shell examples/claude-uv.shell.nix
-#
-# See https://www.nixhub.io/ to find nixpkgs commits by package version.
 let
-  # Use a stable nixpkgs for most tools...
-  nixpkgs = fetchTarball
-    "https://github.com/NixOS/nixpkgs/archive/e764fc9a405871f1f6ca3d1394fb422e0a0c3951.tar.gz"; # nixpkgs 25.11 (2026-02-25)
-  # ...but pull claude-code from unstable to stay on the latest release.
-  nixpkgs-unstable = fetchTarball
-    "https://github.com/NixOS/nixpkgs/archive/80bdc1e5ce51f56b19791b52b2901187931f5353.tar.gz"; # nixpkgs-unstable (2026-02-25)
-
-  pkgs = import nixpkgs { };
-  pkgs-unstable = import nixpkgs-unstable { config.allowUnfree = true; };
+  pkgs = import <nixpkgs> { config.allowUnfree = true; };
   sandbox = import (fetchTarball
     "https://github.com/archie-judd/agent-sandbox.nix/archive/main.tar.gz") {
       pkgs = pkgs;
@@ -39,7 +29,7 @@ let
 in if pkgs.stdenv.isLinux then
   let
     claude-sandboxed = sandbox.mkSandbox {
-      pkg = pkgs-unstable.claude-code;
+      pkg = pkgs.claude-code;
       binName = "claude";
       outName = "claude-sandboxed";
       stateDirs = [ "$HOME/.claude" "$HOME/.cache/uv" "$HOME/.local/share/uv" ];
@@ -78,7 +68,7 @@ else if pkgs.stdenv.isDarwin then
 # workaround, so we skip the pythonWithTkinter and LD_LIBRARY_PATH setup.
   let
     claude-sandboxed = sandbox.mkSandbox {
-      pkg = pkgs-unstable.claude-code;
+      pkg = pkgs.claude-code;
       binName = "claude";
       outName = "claude-sandboxed";
       stateDirs = [ "$HOME/.claude" "$HOME/.cache/uv" "$HOME/.local/share/uv" ];

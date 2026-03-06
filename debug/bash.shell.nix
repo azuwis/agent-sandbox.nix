@@ -14,7 +14,10 @@
 #   ls /some/other/path        # should fail — confirming the sandbox is active
 let
   pkgs = import <nixpkgs> { };
-  sandbox = import ./. { pkgs = pkgs; };
+  sandbox = import (fetchTarball
+    "https://github.com/archie-judd/agent-sandbox.nix/archive/main.tar.gz") {
+      pkgs = pkgs;
+    };
   bash-sandboxed = sandbox.mkSandbox {
     pkg = pkgs.bash;
     binName = "bash";
