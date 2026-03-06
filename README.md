@@ -126,6 +126,44 @@ allowedPackages = [ pkgs.nodejs pkgs.npm ];
 stateDirs = [ "$HOME/.npm" ]; # Allow npm cache
 ```
 
+## Debugging
+
+If the agent fails with `EACCES` or `ENOENT`, the sandbox is likely blocking a path that needs to be added to `stateDirs` or `stateFiles`.
+
+**Both platforms:** the easiest way to explore the sandbox environment is to wrap `bash` itself with the same config as your agent and poke around interactively:
+
+```nix
+bash-sandboxed = sandbox.mkSandbox {
+  pkg = pkgs.bash;
+  binName = "bash";
+  outName = "bash-sandboxed";
+  allowedPackages = [ pkgs.coreutils pkgs.bash ];
+  stateDirs = [ "$HOME/.claude" ];  # mirror your agent's config
+  stateFiles = [ "$HOME/.claude.json" ];
+};
+```
+
+Running `bash-sandboxed` drops you into a shell with exactly the same filesystem view and restrictions your agent will see. Try:
+
+```bash
+ls $HOME                   # should show only your stateDirs
+cat $HOME/.claude.json     # should work if in stateFiles
+ls /tmp                    # should be writable scratch space
+curl https://example.com   # network should be open
+which git                  # check allowedPackages are visible
+ls /some/other/path        # should fail — confirming the sandbox is active
+```
+
+See [`debug/bash.shell.nix`](debug/bash.shell.nix) for a ready-to-use template.
+
+**Linux:** if you're still stuck, look at the error the agent reports — the path in the message is usually enough to identify the missing `stateDirs` or `stateFiles` entry. Paste your config and the error into an AI.
+
+**macOS:** after a failure, query the system log for sandbox denials:
+```bash
+log show --predicate 'eventMessage CONTAINS "deny"' --last 1m
+```
+Each entry shows the denied operation and path, telling you exactly which `stateDirs` or `stateFiles` entry is missing.
+
 ## Platform notes
 
 **Linux:** Uses bubblewrap to build a temporary, isolated environment. The agent is completely cut off from the host machine (unsharing PID, user, IPC, UTS, and cgroup namespaces) and cannot see your host processes.
