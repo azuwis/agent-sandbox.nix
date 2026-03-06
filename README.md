@@ -14,7 +14,6 @@ Prevents agents in YOLO mode from reading your dotfiles, deleting your home dire
 
 Everything else is denied. `$HOME` is either an empty tmpfs (Linux) or inaccessible (macOS).
 
-
 ## Usage
 
 ### In a flake
@@ -72,6 +71,20 @@ See `checks` in `flake.nix` for a minimal working example that is evaluated by `
 
 See [`examples/claude.shell.nix`](examples/claude.shell.nix) for a ready-to-use template. Copy it into your project and adjust as needed.
 
+
+## Arguments
+
+| Argument | Required | Description |
+|---|---|---|
+| `pkg` | yes | Package containing the binary to wrap |
+| `binName` | yes | Name of the binary inside `pkg/bin/` |
+| `outName` | yes | Name for the resulting wrapped binary |
+| `allowedPackages` | yes | Packages whose `bin/` dirs form the sandbox PATH |
+| `stateDirs` | no | Directories the agent can read/write (e.g. `~/.config/claude`) |
+| `stateFiles` | no | Individual files the agent can read/write |
+| `extraEnv` | no | Additional environment variables as an attrset |
+
+
 ## Authentication
 
 Because `$HOME` is masked, agents cannot reach your system keychain, browser sessions, or SSH keys. **Interactive login flows (e.g. `claude /login`, `gh auth login`) will not work inside the sandbox.** You must authenticate via an environment variable token instead.
@@ -108,19 +121,6 @@ extraEnv = {
 > **Tested agents:** `claude-code` and `copilot-cli`. Other agents should work as long as they support token-based auth via an environment variable.
 
 > **Warning:** Git pushes are also blocked as a side effect of masking `$HOME` — the agent has no access to your `~/.ssh` keys. The only exception is if you have a plaintext access token hardcoded directly into your project's `.git/config` remote URL, or if you explicitly pass `GITHUB_TOKEN` in `extraEnv`.
-
-
-## Arguments
-
-| Argument | Required | Description |
-|---|---|---|
-| `pkg` | yes | Package containing the binary to wrap |
-| `binName` | yes | Name of the binary inside `pkg/bin/` |
-| `outName` | yes | Name for the resulting wrapped binary |
-| `allowedPackages` | yes | Packages whose `bin/` dirs form the sandbox PATH |
-| `stateDirs` | no | Directories the agent can read/write (e.g. `~/.config/claude`) |
-| `stateFiles` | no | Individual files the agent can read/write |
-| `extraEnv` | no | Additional environment variables as an attrset |
 
 ## Common Patterns / Recipes
 
