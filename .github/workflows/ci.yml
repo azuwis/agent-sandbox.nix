@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Clean stale nix users (macOS)
+        if: runner.os == 'macOS'
+        #   run: |
+        #     sudo dscl . -delete /Groups/_nixbld 2>/dev/null || true
+        #     sudo dscl . -list /Users | grep _nixbld | while read user; do
+        #       sudo dscl . -delete "/Users/$user"
+        #     done
+        run: |
+          if [ -d /nix ]; then
+            /nix/nix-installer uninstall --no-confirm 2>/dev/null || true
+          fi
+          sudo dscl . -delete /Groups/nixbld 2>/dev/null || true
+          sudo dscl . -delete /Groups/_nixbld 2>/dev/null || true
+          sudo dscl . -list /Users | grep nixbld | while read user; do
+            sudo dscl . -delete "/Users/$user"
+          done
+          sudo rm -rf /etc/nix /nix /var/root/.nix-* 2>/dev/null || true
+          sudo launchctl remove org.nixos.nix-daemon 2>/dev/null || true
+
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Run sandbox tests
+        run: bash tests/test-sandbox.sh
