@@ -109,7 +109,7 @@ extraEnv = {
 };
 ```
 
-Alternatively, if you use sops, you can inject the secret at build time:
+Alternatively, if you use sops, you set a command that will read the secret at runtime.
 
 ```nix
 extraEnv = {
