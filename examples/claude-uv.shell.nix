@@ -30,6 +30,7 @@ let
 
   commonPackages = [
     pkgs.coreutils
+    pkgs.which
     pkgs.bash
     pkgs.git
     pkgs.ripgrep

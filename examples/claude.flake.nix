@@ -26,6 +26,7 @@
             outName = "claude-sandboxed";
             allowedPackages = [
               pkgs.coreutils
+              pkgs.which
               pkgs.bash
               pkgs.git
               pkgs.ripgrep

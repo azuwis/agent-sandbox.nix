@@ -47,6 +47,7 @@ Here is an example flake that provides a development shell with a sandboxed clau
             outName = "claude-sandboxed"; # or whatever alias you'd like
             allowedPackages = [
               pkgs.coreutils
+              pkgs.which
               pkgs.bash
               pkgs.git
               pkgs.ripgrep
@@ -100,6 +101,7 @@ let
     outName = "claude-sandboxed"; # or whatever alias you'd like
     allowedPackages = [
       pkgs.coreutils
+      pkgs.which
       pkgs.bash
       pkgs.git
       pkgs.ripgrep
