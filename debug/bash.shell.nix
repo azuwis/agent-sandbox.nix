@@ -12,6 +12,7 @@
 #   curl https://example.com   # network should be open
 #   which git                  # check allowedPackages are visible
 #   ls /some/other/path        # should fail — confirming the sandbox is active
+#   cat ~/.ssh/id_ed25519      # should fail — confirming the sandbox is active and your real home isn't visible             # should fail
 let
   pkgs = import <nixpkgs> { };
   sandbox = import (fetchTarball

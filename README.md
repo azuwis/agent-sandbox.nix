@@ -218,6 +218,7 @@ touch /tmp/test && rm /tmp/test   # /tmp should be writable
 curl https://example.com          # network should be open
 which git                         # allowedPackages should be on PATH
 ls /some/other/path               # should fail — confirming sandbox is active
+cat ~/.ssh/id_ed25519             # should fail - shouldn't be able to read unspecified files in $HOME
 
 # Linux: $HOME is an empty writable tmpfs (ephemeral, not persisted)
 ls $HOME                          # empty directory
