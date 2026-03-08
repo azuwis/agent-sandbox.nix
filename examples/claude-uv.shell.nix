@@ -15,9 +15,11 @@ let
       pkgs = pkgs;
     };
 
-  # These libraries are threaded into LD_LIBRARY_PATH so that nix-ld can
-  # satisfy dynamic link dependencies (libstdc++, zlib, libX11) for any
-  # compiled wheels uv installs at runtime.
+  isLinux = pkgs.stdenv.isLinux;
+
+  # On NixOS, these libraries are threaded into LD_LIBRARY_PATH so that
+  # nix-ld can satisfy dynamic link dependencies (libstdc++, zlib, libX11)
+  # for any compiled wheels uv installs at runtime.
   dynamicLibraries = [ pkgs.stdenv.cc.cc pkgs.zlib pkgs.xorg.libX11 ];
 
   # Preserve the host LD_LIBRARY_PATH (set by nix-ld) and prepend our libs.
@@ -26,74 +28,47 @@ let
       pkgs.lib.makeLibraryPath dynamicLibraries
     }";
 
-in if pkgs.stdenv.isLinux then
-  let
-    claude-sandboxed = sandbox.mkSandbox {
-      pkg = pkgs.claude-code;
-      binName = "claude";
-      outName = "claude-sandboxed";
-      stateDirs = [ "$HOME/.claude" "$HOME/.cache/uv" "$HOME/.local/share/uv" ];
-      stateFiles = [ "$HOME/.claude.json" ];
-      allowedPackages = [
-        pkgs.coreutils
-        pkgs.bash
-        pkgs.git
-        pkgs.ripgrep
-        pkgs.fd
-        pkgs.gnused
-        pkgs.gnugrep
-        pkgs.findutils
-        pkgs.jq
-        pkgs.uv
-        pkgs.python3
-      ];
-      extraEnv = {
-        CLAUDE_CODE_OAUTH_TOKEN = "$CLAUDE_CODE_OAUTH_TOKEN";
-        GIT_AUTHOR_NAME = "claude-agent";
-        GIT_AUTHOR_EMAIL = "claude-agent@localhost";
-        GIT_COMMITTER_NAME = "claude-agent";
-        GIT_COMMITTER_EMAIL = "claude-agent@localhost";
-        UV_NO_MANAGED_PYTHON = "1";
-        LD_LIBRARY_PATH = ldLibraryPath;
-      };
-    };
-  in pkgs.mkShell {
-    packages = [ pkgs.uv pkgs.python3 claude-sandboxed ];
+  commonPackages = [
+    pkgs.coreutils
+    pkgs.bash
+    pkgs.git
+    pkgs.ripgrep
+    pkgs.fd
+    pkgs.gnused
+    pkgs.gnugrep
+    pkgs.findutils
+    pkgs.jq
+    pkgs.uv
+    pkgs.python3
+  ];
+
+  commonEnv = {
+    CLAUDE_CODE_OAUTH_TOKEN = "$CLAUDE_CODE_OAUTH_TOKEN";
+    GIT_AUTHOR_NAME = "claude-agent";
+    GIT_AUTHOR_EMAIL = "claude-agent@localhost";
+    GIT_COMMITTER_NAME = "claude-agent";
+    GIT_COMMITTER_EMAIL = "claude-agent@localhost";
+  };
+
+  # On NixOS, use a nix-managed Python and tell uv not to install its own.
+  # On macOS, uv can manage Python itself without linker workarounds.
+  linuxEnv = {
     UV_NO_MANAGED_PYTHON = "1";
     LD_LIBRARY_PATH = ldLibraryPath;
-  }
+  };
 
-else if pkgs.stdenv.isDarwin then
-# On macOS, uv can use its own managed Python without the NixOS linker
-# workaround, so we skip the pythonWithTkinter and LD_LIBRARY_PATH setup.
-  let
-    claude-sandboxed = sandbox.mkSandbox {
-      pkg = pkgs.claude-code;
-      binName = "claude";
-      outName = "claude-sandboxed";
-      stateDirs = [ "$HOME/.claude" "$HOME/.cache/uv" "$HOME/.local/share/uv" ];
-      stateFiles = [ "$HOME/.claude.json" ];
-      allowedPackages = [
-        pkgs.coreutils
-        pkgs.bash
-        pkgs.git
-        pkgs.ripgrep
-        pkgs.fd
-        pkgs.gnused
-        pkgs.gnugrep
-        pkgs.findutils
-        pkgs.jq
-        pkgs.uv
-      ];
-      extraEnv = {
-        CLAUDE_CODE_OAUTH_TOKEN = "$CLAUDE_CODE_OAUTH_TOKEN";
-        GIT_AUTHOR_NAME = "claude-agent";
-        GIT_AUTHOR_EMAIL = "claude-agent@localhost";
-        GIT_COMMITTER_NAME = "claude-agent";
-        GIT_COMMITTER_EMAIL = "claude-agent@localhost";
-      };
-    };
-  in pkgs.mkShell { packages = [ pkgs.uv pkgs.python3 claude-sandboxed ]; }
+  claude-sandboxed = sandbox.mkSandbox {
+    pkg = pkgs.claude-code;
+    binName = "claude";
+    outName = "claude-sandboxed";
+    stateDirs = [ "$HOME/.claude" "$HOME/.cache/uv" "$HOME/.local/share/uv" ];
+    stateFiles = [ "$HOME/.claude.json" ];
+    allowedPackages = commonPackages;
+    extraEnv = commonEnv // pkgs.lib.optionalAttrs isLinux linuxEnv;
+  };
 
-else
-  throw "Unsupported platform: ${pkgs.stdenv.hostPlatform.system}"
+in pkgs.mkShell { packages = [ pkgs.uv pkgs.python3 claude-sandboxed ]; }
+// pkgs.lib.optionalAttrs isLinux {
+  UV_NO_MANAGED_PYTHON = "1";
+  LD_LIBRARY_PATH = ldLibraryPath;
+}
