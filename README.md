@@ -275,7 +275,7 @@ If you are unable to debug, or suspect the AI can't access a file or folder it s
 
 When `restrictNetwork = true`, network connections are routed through a localhost proxy that filters requests by domain. The proxy checks the target hostname against `allowedDomains`.
 
-> NOTE: Only Linux, Bubblewrap continues to use `--share-net`, so apps that ignore `HTTP_PROXY`/`HTTPS_PROXY` or make direct TCP/UDP connections can bypass filtering. This is a known limitation.
+> **Note**: On Linux, Bubblewrap uses `--share-net` even when `restrictNetwork=true`, so apps that ignore `HTTP_PROXY`/`HTTPS_PROXY` or make direct TCP/UDP connections can bypass filtering. This is a known limitation.
 
 Blocked requests are logged to `/tmp/sandbox-proxy.log`.
 
