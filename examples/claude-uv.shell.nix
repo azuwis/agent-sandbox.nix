@@ -66,6 +66,21 @@ let
     stateFiles = [ "$HOME/.claude.json" ];
     allowedPackages = commonPackages;
     extraEnv = commonEnv // pkgs.lib.optionalAttrs isLinux linuxEnv;
+    restrictNetwork = true;
+    allowedDomains = [
+      # Anthropic
+      "api.anthropic.com"
+      "statsig.anthropic.com"
+      "mcp-proxy.anthropic.com"
+      "platform.claude.com"
+      # GitHub 
+      "raw.githubusercontent.com"
+      "api.github.com"
+      # PyPI 
+      "pypi.org"
+      "files.pythonhosted.org"
+    ];
+
   };
 
 in pkgs.mkShell { packages = [ pkgs.uv pkgs.python3 claude-sandboxed ]; }

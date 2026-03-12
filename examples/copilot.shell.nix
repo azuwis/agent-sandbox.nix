@@ -36,6 +36,16 @@ let
       GIT_COMMITTER_NAME = "copilot-agent";
       GIT_COMMITTER_EMAIL = "copilot-agent@localhost";
     };
+    restrictNetwork = true;
+    allowedDomains = [
+      # GitHub Copilot
+      "api.business.githubcopilot.com"
+      "telemetry.business.githubcopilot.com"
+      # GitHub
+      "raw.githubusercontent.com"
+      "api.github.com"
+    ];
+
   };
 
 in pkgs.mkShell { packages = [ copilot-sandboxed ]; }

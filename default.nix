@@ -1,5 +1,6 @@
 { pkgs }:
 let
+  sandboxProxy = import ./proxy { pkgs = pkgs; };
   /* mkLinuxSandbox — wraps a binary in a bubblewrap (bwrap) container.
 
        Bubblewrap creates a lightweight Linux namespace sandbox. It builds an
@@ -66,7 +67,8 @@ let
            need to bind-mount the real paths.
   */
   mkLinuxSandbox = { pkg, binName, outName, allowedPackages, stateDirs ? [ ]
-    , stateFiles ? [ ], extraEnv ? { } }:
+    , stateFiles ? [ ], extraEnv ? { }, restrictNetwork ? false
+    , allowedDomains ? [ ] }:
     let
       pathStr = pkgs.lib.makeBinPath allowedPackages;
       mkDirsStr = builtins.concatStringsSep "\n"
@@ -80,15 +82,53 @@ let
       extraEnvStr = builtins.concatStringsSep " "
         (map (name: "--setenv ${name} ${builtins.toJSON extraEnv.${name}}")
           (builtins.attrNames extraEnv));
+      conditionalNetworkingParams = if restrictNetwork then
+        let
+          allowlistFileStr = pkgs.writeText "sandbox-allowlist"
+            (builtins.concatStringsSep "\n" allowedDomains + "\n");
+        in {
+          warnIgnoredDomainsBashStr = "";
+          proxyEnvBubblewrapStr = ''
+            --setenv HTTP_PROXY "http://127.0.0.1:$_PROXY_PORT" --setenv HTTPS_PROXY "http://127.0.0.1:$_PROXY_PORT" --setenv http_proxy "http://127.0.0.1:$_PROXY_PORT" --setenv https_proxy "http://127.0.0.1:$_PROXY_PORT"'';
+          proxyStartupBashStr = ''
+            # Start the domain-filtering proxy and read its port from stdout
+            _PROXY_PORT_FILE=$(mktemp /tmp/sandbox-proxy-port.XXXXXX)
+            ${sandboxProxy}/bin/sandbox-proxy ${allowlistFileStr} > "$_PROXY_PORT_FILE" 2>>/tmp/sandbox-proxy.log &
+            _PROXY_PID=$!
+            for _i in $(seq 1 50); do
+              if [ -s "$_PROXY_PORT_FILE" ]; then break; fi
+              sleep 0.05
+            done
+            _PROXY_PORT=$(cat "$_PROXY_PORT_FILE")
+            rm -f "$_PROXY_PORT_FILE"
+          '';
+          bashTrapCleanupStr = "trap 'kill $_PROXY_PID 2>/dev/null' EXIT";
+          sandboxExecBashStr = "";
+        }
+      else {
+        warnIgnoredDomainsBashStr = if (allowedDomains != [ ]) then ''
+          echo "WARNING: allowedDomains is set but restrictNetwork is false — domains will be ignored" >&2
+        '' else
+          "";
+        proxyEnvBubblewrapStr = "";
+        proxyStartupBashStr = "";
+        bashTrapCleanupStr = "";
+        sandboxExecBashStr = "exec ";
+
+      };
+
     in pkgs.writeShellScriptBin outName ''
       CWD=$(pwd)
+      ${conditionalNetworkingParams.warnIgnoredDomainsBashStr}
       ${mkDirsStr}
       ${mkFilesStr}
       GIT_BIND=""
       if GIT_DIR=$(${pkgs.git}/bin/git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
         GIT_BIND="--bind $GIT_DIR $GIT_DIR"
       fi
-      exec ${pkgs.bubblewrap}/bin/bwrap \
+      ${conditionalNetworkingParams.proxyStartupBashStr}
+      ${conditionalNetworkingParams.bashTrapCleanupStr}
+      ${conditionalNetworkingParams.sandboxExecBashStr}${pkgs.bubblewrap}/bin/bwrap \
         --ro-bind /nix /nix \
         --ro-bind /etc/passwd /etc/passwd \
         --ro-bind /etc/resolv.conf /etc/resolv.conf \
@@ -117,6 +157,7 @@ let
         --setenv SSL_CERT_DIR "''${SSL_CERT_DIR:-/etc/ssl/certs}" \
         --setenv NIX_SSL_CERT_FILE "''${NIX_SSL_CERT_FILE:-/etc/ssl/certs/ca-certificates.crt}" \
         --setenv TMPDIR /tmp \
+        ${conditionalNetworkingParams.proxyEnvBubblewrapStr} \
         ${extraEnvStr} \
         ${pkg}/bin/${binName} "$@"
     '';
@@ -262,7 +303,8 @@ let
        sandboxing on macOS.
   */
   mkDarwinSandbox = { pkg, binName, outName, allowedPackages, stateDirs ? [ ]
-    , stateFiles ? [ ], extraEnv ? { } }:
+    , stateFiles ? [ ], extraEnv ? { }, restrictNetwork ? false
+    , allowedDomains ? [ ] }:
     let
       pathStr = pkgs.lib.makeBinPath allowedPackages;
       # Generate indexed param names
@@ -325,6 +367,55 @@ let
         (map (name: "${name}=${builtins.toJSON extraEnv.${name}}")
           (builtins.attrNames extraEnv));
 
+      conditionalNetworkingParams = if restrictNetwork then
+        let
+          allowlistFileStr = pkgs.writeText "sandbox-allowlist"
+            (builtins.concatStringsSep "\n" allowedDomains + "\n");
+        in {
+          warnIgnoredDomainsBashStr = "";
+          proxyEnvInlineBashStr = ''
+            HTTP_PROXY="http://127.0.0.1:$_PROXY_PORT" HTTPS_PROXY="http://127.0.0.1:$_PROXY_PORT" http_proxy="http://127.0.0.1:$_PROXY_PORT" https_proxy="http://127.0.0.1:$_PROXY_PORT"'';
+          networkSeatbeltRulesStr = ''
+            ;; Network — restricted to localhost only (proxy-based domain filtering)
+            (allow network-outbound (remote ip "localhost:*"))
+            (allow network-outbound (remote unix-socket))
+            (allow network-bind (local ip "localhost:*"))
+            (allow system-socket)
+          '';
+          proxyStartupBashStr = ''
+            # Start the domain-filtering proxy and read its port from stdout
+            _PROXY_PORT_FILE=$(mktemp /tmp/sandbox-proxy-port.XXXXXX)
+            ${sandboxProxy}/bin/sandbox-proxy ${allowlistFileStr} > "$_PROXY_PORT_FILE" 2>>/tmp/sandbox-proxy.log &
+            _PROXY_PID=$!
+            for _i in $(seq 1 50); do
+              if [ -s "$_PROXY_PORT_FILE" ]; then break; fi
+              sleep 0.05
+            done
+            _PROXY_PORT=$(cat "$_PROXY_PORT_FILE")
+            rm -f "$_PROXY_PORT_FILE"
+          '';
+          bashTrapCleanupStr = ''
+            trap 'kill $_PROXY_PID 2>/dev/null; rm -rf "$SANDBOX_HOME"' EXIT'';
+          sandboxExecBashStr = "";
+
+        }
+      else {
+        warnIgnoredDomainsBashStr = if allowedDomains != [ ] then ''
+          echo "WARNING: allowedDomains is set but restrictNetwork is false — domains will be ignored" >&2
+        '' else
+          "";
+        proxyEnvInlineBashStr = "";
+        networkSeatbeltRulesStr = ''
+          ;; Network
+          (allow network*)
+          (allow system-socket)
+        '';
+        proxyStartupBashStr = "";
+        bashTrapCleanupStr = ''trap 'rm -rf "$SANDBOX_HOME"' EXIT'';
+        sandboxExecBashStr = "exec ";
+
+      };
+
       seatbeltProfile = pkgs.writeText "${outName}-sandbox.sb" ''
         (version 1)
         (deny default)
@@ -355,9 +446,7 @@ let
         (allow ipc-posix-shm-write-data)
         (allow ipc-posix-shm-write-create)
 
-        ;; Network
-        (allow network*)
-        (allow system-socket)
+        ${conditionalNetworkingParams.networkSeatbeltRulesStr}
 
         ;; Device nodes & terminal I/O
         (allow file-read*
@@ -463,6 +552,7 @@ let
 
     in pkgs.writeShellScriptBin outName ''
       CWD=$(pwd)
+      ${conditionalNetworkingParams.warnIgnoredDomainsBashStr}
 
       # Ensure stateDirs/stateFiles exist while HOME still points at real home
       ${mkDirsStr}
@@ -489,14 +579,17 @@ let
       # Lives under /tmp which is already allowed read-write in the profile.
       REAL_HOME="$HOME"
       SANDBOX_HOME=$(mktemp -d /tmp/sandbox-home.XXXXXX)
-      trap 'rm -rf "$SANDBOX_HOME"' EXIT
 
       # Symlink state dirs/files into sandbox HOME so $HOME-relative lookups
       # reach the real paths through the Seatbelt-allowed targets.
       ${symlinkStateDirsStr}
       ${symlinkStateFilesStr}
 
-      exec /usr/bin/env -i \
+      ${conditionalNetworkingParams.proxyStartupBashStr}
+      ${conditionalNetworkingParams.bashTrapCleanupStr}
+
+
+      ${conditionalNetworkingParams.sandboxExecBashStr}/usr/bin/env -i \
         HOME="$SANDBOX_HOME" \
         TERM="$TERM" \
         SHELL="${pkgs.bash}/bin/bash" \
@@ -505,6 +598,7 @@ let
         SSL_CERT_DIR="''${SSL_CERT_DIR:-/etc/ssl/certs}" \
         GIT_CONFIG_DIR="$GIT_CONFIG_DIR" \
         TMPDIR=/tmp \
+        ${conditionalNetworkingParams.proxyEnvInlineBashStr} \
         ${extraEnvInlineStr} \
         /usr/bin/sandbox-exec \
         -f ${seatbeltProfile} \
