@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
+# Basic sandbox isolation and access tests
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OS=$(uname)
+
+source "$SCRIPT_DIR/lib.sh"
 
 SANDBOXED=$(nix-build --no-out-link -E "
   let
@@ -26,34 +29,7 @@ TESTDIR=$(mktemp -d)
 trap 'rm -rf "$TESTDIR"' EXIT
 cd "$TESTDIR"
 
-PASS=0
-FAIL=0
-
-expect_ok() {
-	local desc="$1"
-	shift
-	if run "$*"; then
-		echo "PASS: $desc"
-		PASS=$((PASS + 1))
-	else
-		echo "FAIL: $desc (should have succeeded)"
-		FAIL=$((FAIL + 1))
-	fi
-}
-
-expect_fail() {
-	local desc="$1"
-	shift
-	if run "$*"; then
-		echo "FAIL: $desc (should have been denied)"
-		FAIL=$((FAIL + 1))
-	else
-		echo "PASS: $desc"
-		PASS=$((PASS + 1))
-	fi
-}
-
-echo "=== Sandbox tests ($OS) ==="
+echo "=== Basic sandbox tests ($OS) ==="
 echo
 
 # --- Isolation ---
@@ -82,7 +58,6 @@ else
 fi
 
 # --- Environment isolation (env -i) ---
-# Set a variable in the host that isn't in extraEnv and verify it's not propagated
 export _TEST_HOST_VAR="should-not-propagate"
 if [ -z "$(run_output 'echo $_TEST_HOST_VAR')" ]; then
 	echo "PASS: host env vars not in extraEnv are not propagated"
@@ -106,6 +81,5 @@ elif [ "$OS" = "Linux" ]; then
 	expect_fail "cannot read host /etc/shadow" "cat /etc/shadow"
 fi
 
-echo
-echo "=== Results: $PASS passed, $FAIL failed ==="
-[ "$FAIL" -eq 0 ]
+print_results
+exit_status
