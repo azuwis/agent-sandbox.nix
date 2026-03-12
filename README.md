@@ -2,7 +2,7 @@
 
 Lightweight and declarative sandboxing for AI agents on Linux and macOS.
 
-Prevent your agents in YOLO mode from reading your dotfiles, accessing your SSH keys, deleting your $HOME or touching anything outside of the project.  Works with any CLI-based AI agent. Network access is left unrestricted for API calls.
+Prevent your agents in YOLO mode from reading your dotfiles, accessing your SSH keys, deleting your $HOME or touching anything outside of the project. Works with any CLI-based AI agent. Network access is unrestricted by default, but can optionally be limited to specific domains.
 
 The sandbox uses [bubblewrap](https://github.com/containers/bubblewrap) on Linux and sandbox-exec on macOS.
 
@@ -10,7 +10,7 @@ The sandbox uses [bubblewrap](https://github.com/containers/bubblewrap) on Linux
 
 - Read/write the current working directory
 - Read/write explicitly declared state dirs and files
-- Network access (unrestricted)
+- Optionally restrict network access to particular domains
 - Binaries from `allowedPackages`
 - Environment variables from extraEnv (host environment is cleared)
 - `/nix/store` (read-only), `/tmp` (ephemeral), local git repo access (commits allowed; `git push` is blocked)
@@ -128,6 +128,27 @@ let
 in pkgs.mkShell { packages = [ claude-sandboxed ]; }
 ```
 
+### Network restrictions
+
+By default, network access is unrestricted. But you can optionally restrict connections to specific domains:
+
+```nix
+  claude-sandboxed = sandbox.mkSandbox {
+    pkg = pkgs.claude-code;
+    binName = "claude";
+    outName = "claude-sandboxed";
+    allowedPackages = [ ... ];
+    ...
+    restrictNetwork = true;
+    allowedDomains = [
+      "api.anthropic.com"
+      "sentry.io"
+    ];
+  };
+```
+
+`allowedDomains` are suffix-matched, so you "anthropic.com" will capture all *.anthropic.com domains.
+
 ## Arguments
 
 | Argument | Required | Description |
@@ -139,6 +160,8 @@ in pkgs.mkShell { packages = [ claude-sandboxed ]; }
 | `stateDirs` | no | Directories the agent can read/write (e.g. `~/.config/claude`) |
 | `stateFiles` | no | Individual files the agent can read/write |
 | `extraEnv` | no | Additional environment variables as an attrset |
+| `restrictNetwork` | no | When `true`, network is limited to `allowedDomains` (default `false`) |
+| `allowedDomains` | no | Domains the sandbox can reach when `restrictNetwork = true` |
 
 
 ## Authentication
@@ -217,7 +240,7 @@ Running `bash-sandboxed --norc --noprofile` drops you into a shell with exactly 
 
 ```bash
 touch /tmp/test && rm /tmp/test   # /tmp should be writable
-curl https://example.com          # network should be open
+curl https://example.com          # depends on restrictNetwork setting
 which git                         # allowedPackages should be on PATH
 ls /some/other/path               # should fail — confirming sandbox is active
 cat ~/.ssh/id_ed25519             # should fail - shouldn't be able to read unspecified files in $HOME
@@ -227,7 +250,13 @@ echo test > $HOME/.claude.json    # should work if in stateFiles (symlinked)
 ls $HOME/.claude                  # should work if in stateDirs (symlinked)
 ```
 
-See [`debug/bash.shell.nix`](debug/bash.shell.nix) for a ready-to-use template.
+See [`debug/bash.shell.nix`](debug/bash.shell.nix) for a ready-to-use template (has `restrictNetwork = true` with `httpbin.org` allowed for testing).
+
+**Network issues:** If `restrictNetwork = true` and requests are failing, check which domains are being blocked:
+```bash
+tail -f /tmp/sandbox-proxy.log
+```
+You may need to add them `allowDomains`.
 
 **macOS:** after a failure, you can query the system log for sandbox denials:
 ```bash
@@ -242,9 +271,17 @@ If you are unable to debug, or suspect the AI can't access a file or folder it s
 
 **macOS:** Uses `sandbox-exec` to enforce a strict "deny-default" security policy.
 
+## How network restrictions work
+
+When `restrictNetwork = true`, network connections are routed through a localhost proxy that filters requests by domain. The proxy checks the target hostname against `allowedDomains`.
+
+> NOTE: Only Linux, Bubblewrap continues to use `--share-net`, so apps that ignore `HTTP_PROXY`/`HTTPS_PROXY` or make direct TCP/UDP connections can bypass filtering. This is a known limitation.
+
+Blocked requests are logged to `/tmp/sandbox-proxy.log`.
+
 ## Caveats
 
-- **The network is fully open.** A compromised agent can exfiltrate any file it *can* read to a remote server.
+- **Network exfiltration.** Without `restrictNetwork`, an agent can exfiltrate any file it can read. With restrictions, macOS is fully filtered but Linux is proxy-based only.
 - **`sandbox-exec` is deprecated on macOS.** It remains the only native unprivileged sandboxing mechanism and currently works on macOS 26 (Tahoe) and older, but may break in a future release.
 - **State directories dictate your safety.** The sandbox is only as safe as what you pass into `stateDirs`. Never add `$HOME`.
 - See the comments in `default.nix` for detailed debugging tips for each platform.

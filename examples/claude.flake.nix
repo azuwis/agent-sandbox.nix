@@ -27,6 +27,7 @@
             allowedPackages = [
               pkgs.coreutils
               pkgs.which
+              pkgs.curl
               pkgs.bash
               pkgs.git
               pkgs.ripgrep
@@ -47,6 +48,15 @@
               GIT_COMMITTER_NAME = "claude-agent";
               GIT_COMMITTER_EMAIL = "claude-agent@localhost";
             };
+            restrictNetwork = true;
+            allowedDomains = [
+              # Anthropic
+              "anthropic.com"
+              "claude.com"
+              # GitHub
+              "raw.githubusercontent.com"
+              "api.github.com"
+            ];
           };
         in { default = pkgs.mkShell { packages = [ claude-sandboxed ]; }; });
     };

@@ -9,7 +9,8 @@
 #   ls $HOME                   # empty ephemeral tmpfs with symlinks to stateDirs/stateFiles
 #   cat $HOME/.claude.json     # should work if in stateFiles
 #   ls /tmp                    # should be writable scratch space
-#   curl https://example.com   # network should be open
+#   curl https://httpbin.org/get  # allowed domain — should work
+#   curl https://example.com      # blocked domain — should fail
 #   which git                  # check allowedPackages are visible
 #   ls /some/other/path        # should fail — confirming the sandbox is active
 #   cat ~/.ssh/id_ed25519      # should fail — confirming the sandbox is active and your real home isn't visible
@@ -17,7 +18,7 @@ let
   pkgs = import <nixpkgs> { };
   sandbox = import (fetchTarball
     "https://github.com/archie-judd/agent-sandbox.nix/archive/main.tar.gz") {
-      pkgs = pkgs;
+      inherit pkgs;
     };
   bash-sandboxed = sandbox.mkSandbox {
     pkg = pkgs.bash;
@@ -29,6 +30,8 @@ let
     stateDirs = [ "$HOME/.claude" ];
     stateFiles = [ "$HOME/.claude.json" ];
     extraEnv = { HELLO = "world"; };
+    restrictNetwork = true;
+    allowedDomains = [ "httpbin.org" ];
   };
 in pkgs.mkShell {
   packages = [ bash-sandboxed ];

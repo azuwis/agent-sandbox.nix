@@ -37,5 +37,14 @@ let
       GIT_COMMITTER_NAME = "claude-agent";
       GIT_COMMITTER_EMAIL = "claude-agent@localhost";
     };
+    restrictNetwork = true;
+    allowedDomains = [
+      # Anthropic
+      "anthropic.com"
+      "claude.com"
+      # GitHub
+      "raw.githubusercontent.com"
+      "api.github.com"
+    ];
   };
 in pkgs.mkShell { packages = [ claude-sandboxed ]; }

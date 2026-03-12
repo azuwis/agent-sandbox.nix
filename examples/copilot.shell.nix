@@ -4,7 +4,6 @@
 # Usage:
 #   export GITHUB_TOKEN="your_token_here"
 #   nix-shell examples/copilot.shell.nix
-
 let
   pkgs = import <nixpkgs> { config.allowUnfree = true; };
   sandbox = import (fetchTarball
@@ -36,6 +35,15 @@ let
       GIT_COMMITTER_NAME = "copilot-agent";
       GIT_COMMITTER_EMAIL = "copilot-agent@localhost";
     };
+    restrictNetwork = true;
+    allowedDomains = [
+      # GitHub Copilot
+      "githubcopilot.com"
+      # GitHub
+      "raw.githubusercontent.com"
+      "api.github.com"
+    ];
+
   };
 
 in pkgs.mkShell { packages = [ copilot-sandboxed ]; }
