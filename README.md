@@ -233,6 +233,8 @@ bash-sandboxed = sandbox.mkSandbox {
   allowedPackages = [ pkgs.coreutils pkgs.bash ];
   stateDirs = [ "$HOME/.claude" ];  
   stateFiles = [ "$HOME/.claude.json" "$HOME/.claude.json.lock" ];
+  restrictNetwork = true;
+  allowedDomains = [ "httpbin.org" ];
 };
 ```
 
@@ -248,6 +250,8 @@ ls $HOME                          # empty dir with symlinks to stateDirs/stateFi
 touch $HOME/.test && rm $HOME/.test  # writes allowed (but ephemeral)
 echo test > $HOME/.claude.json    # should work if in stateFiles (symlinked)
 ls $HOME/.claude                  # should work if in stateDirs (symlinked)
+curl https://httpbin.org/get      # allowed domain — should work
+curl https://example.com          # blocked domain — should fail
 ```
 
 See [`debug/bash.shell.nix`](debug/bash.shell.nix) for a ready-to-use template (has `restrictNetwork = true` with `httpbin.org` allowed for testing).
