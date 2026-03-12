@@ -16,7 +16,10 @@
 #   cat ~/.ssh/id_ed25519      # should fail — confirming the sandbox is active and your real home isn't visible
 let
   pkgs = import <nixpkgs> { };
-  sandbox = import ../default.nix { pkgs = pkgs; };
+  sandbox = import (fetchTarball
+    "https://github.com/archie-judd/agent-sandbox.nix/archive/main.tar.gz") {
+      inherit pkgs;
+    };
   bash-sandboxed = sandbox.mkSandbox {
     pkg = pkgs.bash;
     binName = "bash";

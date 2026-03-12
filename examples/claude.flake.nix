@@ -51,10 +51,8 @@
             restrictNetwork = true;
             allowedDomains = [
               # Anthropic
-              "api.anthropic.com"
-              "statsig.anthropic.com"
-              "mcp-proxy.anthropic.com"
-              "platform.claude.com"
+              "anthropic.com"
+              "claude.com"
               # GitHub
               "raw.githubusercontent.com"
               "api.github.com"

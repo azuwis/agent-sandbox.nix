@@ -6,7 +6,10 @@
 #   nix-shell examples/claude.shell.nix
 let
   pkgs = import <nixpkgs> { config.allowUnfree = true; };
-  sandbox = import ../. { pkgs = pkgs; };
+  sandbox = import (fetchTarball
+    "https://github.com/archie-judd/agent-sandbox.nix/archive/main.tar.gz") {
+      pkgs = pkgs;
+    };
   claude-sandboxed = sandbox.mkSandbox {
     pkg = pkgs.claude-code;
     binName = "claude";
@@ -37,10 +40,8 @@ let
     restrictNetwork = true;
     allowedDomains = [
       # Anthropic
-      "api.anthropic.com"
-      "statsig.anthropic.com"
-      "mcp-proxy.anthropic.com"
-      "platform.claude.com"
+      "anthropic.com"
+      "claude.com"
       # GitHub
       "raw.githubusercontent.com"
       "api.github.com"

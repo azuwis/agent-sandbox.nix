@@ -4,7 +4,6 @@
 # Usage:
 #   export GITHUB_TOKEN="your_token_here"
 #   nix-shell examples/copilot.shell.nix
-
 let
   pkgs = import <nixpkgs> { config.allowUnfree = true; };
   sandbox = import (fetchTarball
@@ -39,8 +38,7 @@ let
     restrictNetwork = true;
     allowedDomains = [
       # GitHub Copilot
-      "api.business.githubcopilot.com"
-      "telemetry.business.githubcopilot.com"
+      "githubcopilot.com"
       # GitHub
       "raw.githubusercontent.com"
       "api.github.com"
