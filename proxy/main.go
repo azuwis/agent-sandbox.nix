@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 func loadAllowlist(path string) ([]string, error) {
@@ -85,7 +86,7 @@ func handle(conn net.Conn, allowlist []string) {
 	if req.Method == http.MethodConnect {
 		host := hostOnly(req.Host)
 		if !isAllowed(host, allowlist) {
-			fmt.Fprintf(os.Stderr, "blocked: %s\n", req.Host)
+			fmt.Fprintf(os.Stderr, "%s blocked: %s\n", time.Now().Format(time.RFC3339), req.Host)
 			fmt.Fprintf(conn, "HTTP/1.1 403 Forbidden\r\n\r\n")
 			return
 		}
@@ -101,7 +102,7 @@ func handle(conn net.Conn, allowlist []string) {
 	} else {
 		host := hostOnly(req.Host)
 		if !isAllowed(host, allowlist) {
-			fmt.Fprintf(os.Stderr, "blocked: %s\n", req.Host)
+			fmt.Fprintf(os.Stderr, "%s blocked: %s\n", time.Now().Format(time.RFC3339), req.Host)
 			fmt.Fprintf(conn, "HTTP/1.1 403 Forbidden\r\n\r\n")
 			return
 		}
