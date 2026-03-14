@@ -327,3 +327,17 @@ Blocked requests are logged to `/tmp/sandbox-proxy.log`.
 - **State directories dictate your safety.** The sandbox is only as safe as what you pass into `stateDirs`. Never add `$HOME`.
 - See the comments in `default.nix` for detailed debugging tips for each platform.
 - Tested on x86_64-linux and aarch64-darwin. Other architectures should work but are untested.
+
+## Similar projects
+
+There are several other tools for sandboxing AI agents. Here are a few:
+
+[**Anthropic sandbox-runtime (srt)**](https://github.com/anthropic-experimental/sandbox-runtime/tree/main) — An npm package that also uses bubblewrap on Linux and sandbox-exec on Macos. 
+
+[**jail.nix**](https://git.sr.ht/~alexdavid/jail.nix) — A nix library for building bubblewrap sandboxes. It's not built to be agent-specific but can be used for agent sandboxing. Linux only.
+
+[**jailed-agents**](https://github.com/andersonjoseph/jailed-agents) — A nix library that provides pre-configured per-agent sandboxes using bubblewrap. Linux only. 
+
+[**agent-box**](https://github.com/fletchgqc/agentbox) — A rust CLI that uses disposable containers with Jujutsu or Git worktrees. MacOS and Linux.
+
+
