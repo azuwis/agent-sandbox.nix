@@ -67,7 +67,7 @@ let
            need to bind-mount the real paths.
   */
   mkLinuxSandbox = { pkg, binName, outName, allowedPackages, stateDirs ? [ ]
-    , stateFiles ? [ ], extraEnv ? { }, restrictNetwork ? false
+    , stateFiles ? [ ], extraEnv ? { }, restrictClosure ? false, restrictNetwork ? false
     , allowedDomains ? [ ] }:
     let
       pathStr = pkgs.lib.makeBinPath allowedPackages;
@@ -82,6 +82,15 @@ let
       extraEnvStr = builtins.concatStringsSep " "
         (map (name: "--setenv ${name} ${builtins.toJSON extraEnv.${name}}")
           (builtins.attrNames extraEnv));
+      closureInfo = pkgs.writeClosure ([ pkg ] ++ allowedPackages);
+      nixStoreStr = if restrictClosure then ''
+        mapfile -t paths <${closureInfo}
+        for path in "''${paths[@]}"; do
+          BWRAP_STORE_ARGS+=(--ro-bind "$path" "$path")
+        done
+      '' else ''
+        BWRAP_STORE_ARGS=(--ro-bind /nix /nix)
+      '';
       conditionalNetworkingParams = if restrictNetwork then
         let
           allowlistFileStr = pkgs.writeText "sandbox-allowlist"
@@ -138,8 +147,10 @@ let
       fi
       ${conditionalNetworkingParams.proxyStartupBashStr}
       ${conditionalNetworkingParams.bashTrapCleanupStr}
+      BWRAP_STORE_ARGS=()
+      ${nixStoreStr}
       ${conditionalNetworkingParams.sandboxExecBashStr}${pkgs.bubblewrap}/bin/bwrap \
-        --ro-bind /nix /nix \
+        "''${BWRAP_STORE_ARGS[@]}" \
         --ro-bind /etc/passwd /etc/passwd \
         --ro-bind /etc/resolv.conf /etc/resolv.conf \
         --ro-bind-try /etc/ssl/certs /etc/ssl/certs \
